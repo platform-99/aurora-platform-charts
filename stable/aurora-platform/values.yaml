@@ -90,6 +90,7 @@ core:
     # auroraController: {}
     # awsEbsCsiDriver: {}
     # awsLoadbalancerController: {}
+    # awsKarpenter: {}
     # certManager: {}
     # cidrAllocator: {}
     # cilium: {}
