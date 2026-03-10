@@ -165,8 +165,5 @@ eni:
     subnetTagsFilter: {{ .Values.components.cilium.eni.subnetTagsFilter }}
 
 routingMode: native
-
-bpf:
-  hostLegacyRouting: true
 {{- end }}
 {{- end }}
