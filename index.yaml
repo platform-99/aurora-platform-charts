@@ -40,6 +40,38 @@ entries:
   aurora-platform:
   - apiVersion: v2
     appVersion: 2.0.0
+    created: "2026-03-10T04:31:58.901712365Z"
+    dependencies:
+    - alias: core
+      condition: core.enabled
+      name: aurora-core
+      repository: ""
+      version: 0.0.1
+    - alias: app
+      condition: app.enabled
+      import-values:
+      - child: data
+        parent: global.imports
+      name: aurora-app
+      repository: ""
+      version: 0.0.1
+    - alias: mgmt
+      condition: mgmt.enabled
+      import-values:
+      - child: data
+        parent: global.imports
+      name: aurora-mgmt
+      repository: ""
+      version: 0.0.1
+    description: Aurora Platform
+    digest: fdf3be2819d82c5f2e7b20cb94bc6899c4a8229f7878385ca49433bb2addbc44
+    name: aurora-platform
+    type: application
+    urls:
+    - https://github.com/platform-99/aurora-platform-charts/releases/download/aurora-platform-0.0.178/aurora-platform-0.0.178.tgz
+    version: 0.0.178
+  - apiVersion: v2
+    appVersion: 2.0.0
     created: "2026-03-10T03:15:51.625042306Z"
     dependencies:
     - alias: core
@@ -215,4 +247,4 @@ entries:
     urls:
     - https://github.com/platform-99/aurora-platform-charts/releases/download/raw-0.0.1/raw-0.0.1.tgz
     version: 0.0.1
-generated: "2026-03-10T03:15:51.625063164Z"
+generated: "2026-03-10T04:31:58.901736841Z"
