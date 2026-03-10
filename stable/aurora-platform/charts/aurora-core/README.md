@@ -100,6 +100,7 @@ Aurora Platform - Core Platform
 | components.awsKarpenter.nodePools.enabled | bool | `false` | Sync NodePools/EC2NodeClasses from Git |
 | components.awsKarpenter.nodePools.repoURL | string | `"https://github.com/MichaelPatsula/aws-platform"` |  |
 | components.awsKarpenter.nodePools.path | string | `"clusters/non-prod/mgmt-dev-cc-00"` |  |
+| components.awsKarpenter.nodePools.include | string | `"node-pools.yaml"` | When set, only sync this file from the path directory |
 | components.awsKarpenter.nodePools.targetRevision | string | `"main"` |  |
 | components.awsKarpenter.nodeSelector | object | `{"kubernetes.io/os":"linux","node.ssc-spc.gc.ca/purpose":"system"}` |  |
 | components.awsKarpenter.tolerations | list | `[{"key":"CriticalAddonsOnly","operator":"Exists"}]` |  |

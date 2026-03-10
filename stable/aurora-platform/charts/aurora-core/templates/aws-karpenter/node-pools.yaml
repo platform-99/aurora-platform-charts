@@ -14,6 +14,10 @@ spec:
     repoURL: {{ .Values.components.awsKarpenter.nodePools.repoURL }}
     path: {{ .Values.components.awsKarpenter.nodePools.path }}
     targetRevision: {{ .Values.components.awsKarpenter.nodePools.targetRevision }}
+    {{- if .Values.components.awsKarpenter.nodePools.include }}
+    directory:
+      include: {{ .Values.components.awsKarpenter.nodePools.include | quote }}
+    {{- end }}
 
   destination:
     name: {{ .Values.global.cluster }}
