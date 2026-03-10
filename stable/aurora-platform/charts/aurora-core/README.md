@@ -97,6 +97,10 @@ Aurora Platform - Core Platform
 | components.awsKarpenter.resources | object | `{"requests":{"cpu":"1","memory":"1Gi"},"limits":{"cpu":"1","memory":"1Gi"}}` |  |
 | components.awsKarpenter.serviceMonitor.enabled | bool | `true` |  |
 | components.awsKarpenter.interruptionQueue | string | `""` | SQS queue name (defaults to cluster name) |
+| components.awsKarpenter.nodePools.enabled | bool | `false` | Sync NodePools/EC2NodeClasses from Git |
+| components.awsKarpenter.nodePools.repoURL | string | `"https://github.com/MichaelPatsula/aws-platform"` |  |
+| components.awsKarpenter.nodePools.path | string | `"clusters/non-prod/mgmt-dev-cc-00"` |  |
+| components.awsKarpenter.nodePools.targetRevision | string | `"main"` |  |
 | components.awsKarpenter.nodeSelector | object | `{"kubernetes.io/os":"linux","node.ssc-spc.gc.ca/purpose":"system"}` |  |
 | components.awsKarpenter.tolerations | list | `[{"key":"CriticalAddonsOnly","operator":"Exists"}]` |  |
 | components.certManager.acmesolver.image.repository | string | `"jetstack/cert-manager-acmesolver"` |  |

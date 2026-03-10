@@ -384,6 +384,13 @@ components:
     serviceMonitor:
       enabled: true
 
+    # Argo CD Application to sync NodePools/EC2NodeClasses from Git
+    nodePools:
+      enabled: true
+      repoURL: https://github.com/MichaelPatsula/aws-platform
+      path: clusters/non-prod/mgmt-dev-cc-00
+      targetRevision: main
+
   certManager:
     enabled: true
 

@@ -28,16 +28,12 @@ spec:
                 - Ingress
                 - Egress
               ingress:
-                - from:
-                    - ipBlock:
-                        cidr: 0.0.0.0/0
+                - {}
               egress:
-                - to:
-                    - ipBlock:
-                        cidr: 0.0.0.0/0
+                - {}
   destination:
     name: {{ .Values.global.cluster }}
-    namespace: platform-system
+    namespace: karpenter-system
   syncPolicy:
     automated:
       prune: true

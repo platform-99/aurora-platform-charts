@@ -1,0 +1,29 @@
+{{ if eq .Values.global.provider "aws" -}}
+{{ if .Values.components.awsKarpenter.enabled -}}
+{{ if .Values.components.awsKarpenter.nodePools.enabled -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-aws-karpenter-node-pools"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    repoURL: {{ .Values.components.awsKarpenter.nodePools.repoURL }}
+    path: {{ .Values.components.awsKarpenter.nodePools.path }}
+    targetRevision: {{ .Values.components.awsKarpenter.nodePools.targetRevision }}
+
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: karpenter-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}
+{{- end }}
+{{- end }}
