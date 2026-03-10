@@ -96,7 +96,7 @@ Aurora Platform - Core Platform
 | components.awsKarpenter.replicas | int | `2` |  |
 | components.awsKarpenter.resources | object | `{"requests":{"cpu":"1","memory":"1Gi"},"limits":{"cpu":"1","memory":"1Gi"}}` |  |
 | components.awsKarpenter.serviceMonitor.enabled | bool | `true` |  |
-| components.awsKarpenter.interruptionQueue | string | `""` | SQS queue name (defaults to cluster name) |
+| components.awsKarpenter.interruptionQueue | string | `""` | SQS queue name (defaults to &lt;cluster-name&gt;-karpenter-interruption) |
 | components.awsKarpenter.nodePools.enabled | bool | `false` | Sync NodePools/EC2NodeClasses from Git |
 | components.awsKarpenter.nodePools.repoURL | string | `"https://github.com/MichaelPatsula/aws-platform"` |  |
 | components.awsKarpenter.nodePools.path | string | `"clusters/non-prod/mgmt-dev-cc-00"` |  |

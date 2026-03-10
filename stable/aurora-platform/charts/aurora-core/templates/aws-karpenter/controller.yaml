@@ -38,7 +38,7 @@ spec:
 
         settings:
           clusterName: {{ .Values.global.cluster | quote }}
-          interruptionQueue: {{ (.Values.components.awsKarpenter.interruptionQueue | default .Values.global.cluster) | quote }}
+          interruptionQueue: {{ (.Values.components.awsKarpenter.interruptionQueue | default (printf "%s-karpenter-interruption" .Values.global.cluster)) | quote }}
   destination:
     name: {{ .Values.global.cluster }}
     namespace: karpenter-system
