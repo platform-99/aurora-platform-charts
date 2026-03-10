@@ -88,6 +88,17 @@ Aurora Platform - Core Platform
 | components.awsLoadbalancerController.resources.requests.memory | string | `"128Mi"` |  |
 | components.awsLoadbalancerController.tolerations[0].key | string | `"CriticalAddonsOnly"` |  |
 | components.awsLoadbalancerController.tolerations[0].operator | string | `"Exists"` |  |
+| components.awsKarpenter.enabled | bool | `false` |  |
+| components.awsKarpenter.helm | object | `{}` |  |
+| components.awsKarpenter.image.repository | string | `"karpenter/controller"` |  |
+| components.awsKarpenter.imagePullSecrets | list | `[]` |  |
+| components.awsKarpenter.priorityClassName | string | `"system-cluster-critical"` |  |
+| components.awsKarpenter.replicas | int | `2` |  |
+| components.awsKarpenter.resources | object | `{"requests":{"cpu":"1","memory":"1Gi"},"limits":{"cpu":"1","memory":"1Gi"}}` |  |
+| components.awsKarpenter.serviceMonitor.enabled | bool | `true` |  |
+| components.awsKarpenter.interruptionQueue | string | `""` | SQS queue name (defaults to cluster name) |
+| components.awsKarpenter.nodeSelector | object | `{"kubernetes.io/os":"linux","node.ssc-spc.gc.ca/purpose":"system"}` |  |
+| components.awsKarpenter.tolerations | list | `[{"key":"CriticalAddonsOnly","operator":"Exists"}]` |  |
 | components.certManager.acmesolver.image.repository | string | `"jetstack/cert-manager-acmesolver"` |  |
 | components.certManager.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels."app.kubernetes.io/component" | string | `"controller"` |  |
 | components.certManager.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey | string | `"kubernetes.io/hostname"` |  |

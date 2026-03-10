@@ -39,6 +39,7 @@ Please consult the [Project Aurora Template](https://github.com/gccloudone-auror
       - [aurora-controller](./stable/aurora-platform/charts/aurora-core/templates/aurora-controller)
       - [aws-ebs-csi-driver](./stable/aurora-platform/charts/aurora-core/templates/aws-ebs-csi-driver)
       - [aws-loadbalancer-controller](./stable/aurora-platform/charts/aurora-core/templates/aws-loadbalancer-controller)
+      - [aws-karpenter](./stable/aurora-platform/charts/aurora-core/templates/aws-karpenter)
       - [cert-manager](./stable/aurora-platform/charts/aurora-core/templates/cert-manager)
       - [cidr-allocator](./stable/aurora-platform/charts/aurora-core/templates/cidr-allocator)
       - [cilium](./stable/aurora-platform/charts/aurora-core/templates/cilium)

@@ -1,0 +1,51 @@
+{{ if eq .Values.global.provider "aws" -}}
+{{ if .Values.components.awsKarpenter.enabled -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-aws-karpenter"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ default "karpenter" .Values.components.awsKarpenter.helm.chart }}
+    repoURL: {{ default "public.ecr.aws/karpenter" .Values.components.awsKarpenter.helm.repository }}
+    targetRevision: {{ default "1.9.0" .Values.components.awsKarpenter.helm.targetRevision }}
+    helm:
+      releaseName: karpenter
+      values: |
+        controller:
+          image: {{ default "{}" (include "awsKarpenter.image" .) | nindent 12 }}
+          resources: {{ toYaml .Values.components.awsKarpenter.resources | nindent 12 }}
+
+        replicas: {{ .Values.components.awsKarpenter.replicas }}
+
+        priorityClassName: {{ .Values.components.awsKarpenter.priorityClassName }}
+
+        nodeSelector: {{ toYaml .Values.components.awsKarpenter.nodeSelector | nindent 12 }}
+        tolerations: {{ toYaml .Values.components.awsKarpenter.tolerations | nindent 12 }}
+
+        imagePullSecrets: {{ toYaml .Values.components.awsKarpenter.imagePullSecrets | nindent 12 }}
+
+        serviceAccount:
+          create: true
+          name: karpenter
+
+        serviceMonitor:
+          enabled: {{ .Values.components.awsKarpenter.serviceMonitor.enabled }}
+
+        settings:
+          clusterName: {{ .Values.global.cluster | quote }}
+          interruptionQueue: {{ (.Values.components.awsKarpenter.interruptionQueue | default .Values.global.cluster) | quote }}
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: karpenter-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}
+{{- end }}

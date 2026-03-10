@@ -344,6 +344,46 @@ components:
     enableCertManager: true
     enableServiceMinitor: true
 
+  awsKarpenter:
+    enabled: false
+
+    helm: {}
+      # OCI chart: oci://public.ecr.aws/karpenter/karpenter
+      # chart: karpenter
+      # targetRevision: 1.9.0
+
+    imagePullSecrets: []
+    image:
+      # registry: public.ecr.aws
+      repository: karpenter/controller
+      # tag: "1.9.0"
+      # pullPolicy: IfNotPresent
+
+    replicas: 2
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 1Gi
+
+    nodeSelector:
+      kubernetes.io/os: linux
+      node.ssc-spc.gc.ca/purpose: system
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+
+    priorityClassName: system-cluster-critical
+
+    # SQS queue name for EC2 interruption events (Spot, maintenance, rebalance).
+    # Defaults to cluster name when empty or not set.
+    interruptionQueue: ""
+
+    serviceMonitor:
+      enabled: true
+
   certManager:
     enabled: true
 
