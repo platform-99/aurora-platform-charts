@@ -163,5 +163,7 @@ eni:
     # when Cilium is deployed. If you only want to control subnets for ENIs attached by Cilium,
     # use the CNI configuration file settings (cni.customConf) instead.
     subnetTagsFilter: {{ .Values.components.cilium.eni.subnetTagsFilter }}
+
+routingMode: native
 {{- end }}
 {{- end }}
