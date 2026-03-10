@@ -345,7 +345,7 @@ components:
     enableServiceMinitor: true
 
   awsKarpenter:
-    enabled: false
+    enabled: true
 
     helm: {}
       # OCI chart: oci://public.ecr.aws/karpenter/karpenter
