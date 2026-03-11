@@ -73,9 +73,11 @@ spec:
 
         prometheus: {{ toYaml .Values.components.certManager.prometheus | nindent 10 }}
 
-        serviceAccount:
-          annotations:
-              {{- include "certManager.azureWorkloadIdentity.clientId" . | nindent 12 }}        
+        {{- if .Values.components.certManager.azureWorkloadIdentity.enabled }}
+          serviceAccount:
+            annotations:
+                {{- include "certManager.azureWorkloadIdentity.clientId" . | nindent 12 }}        
+        {{- end }}
 
   destination:
     name: {{ .Values.global.cluster }}
