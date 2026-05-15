@@ -1,0 +1,115 @@
+{{ if .Values.components.externalDns.enabled -}}
+
+{{- $annotations := dict }}
+{{- range $k, $v := (.Values.components.externalDns.serviceAccount.annotations | default dict) }}
+{{- $_ := set $annotations $k $v }}
+{{- end }}
+{{- if and (eq .Values.global.provider "azure") .Values.components.externalDns.azureWorkloadIdentity.enabled .Values.components.externalDns.azureWorkloadIdentity.clientId }}
+{{- $_ := set $annotations "azure.workload.identity/client-id" .Values.components.externalDns.azureWorkloadIdentity.clientId }}
+{{- end }}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-external-dns"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ default "external-dns" .Values.components.externalDns.helm.chart }}
+    {{- if .Values.components.externalDns.helm.repository }}
+    repoURL: {{ .Values.components.externalDns.helm.repository }}
+    {{- else }}
+    repoURL: {{ default "https://kubernetes-sigs.github.io/external-dns" .Values.global.helm.repository }}
+    {{- end }}
+    targetRevision: {{ default "1.21.1" .Values.components.externalDns.helm.targetRevision }}
+    helm:
+      releaseName: external-dns
+      values: |
+        global:
+          imagePullSecrets: {{ toYaml .Values.components.externalDns.imagePullSecrets | nindent 10 }}
+
+        image: {{ default "{}" (include "externalDns.image" .) | nindent 10 }}
+        imagePullSecrets: {{ toYaml .Values.components.externalDns.imagePullSecrets | nindent 10 }}
+
+        priorityClassName: {{ .Values.components.externalDns.priorityClassName | quote }}
+        resources: {{ toYaml .Values.components.externalDns.resources | nindent 10 }}
+        nodeSelector: {{ toYaml .Values.components.externalDns.nodeSelector | nindent 10 }}
+        tolerations: {{ toYaml .Values.components.externalDns.tolerations | nindent 10 }}
+        affinity: {{ toYaml .Values.components.externalDns.affinity | nindent 10 }}
+
+        logLevel: {{ .Values.components.externalDns.logLevel | quote }}
+        logFormat: {{ .Values.components.externalDns.logFormat | quote }}
+        interval: {{ .Values.components.externalDns.interval | quote }}
+        triggerLoopOnEvent: {{ .Values.components.externalDns.triggerLoopOnEvent }}
+        namespaced: {{ .Values.components.externalDns.namespaced }}
+        policy: {{ .Values.components.externalDns.policy | quote }}
+        registry: {{ .Values.components.externalDns.registry | quote }}
+        txtOwnerId: {{ .Values.components.externalDns.txtOwnerId | default .Values.global.cluster | quote }}
+
+        sources: {{ toYaml .Values.components.externalDns.sources | nindent 10 }}
+        domainFilters: {{ toYaml .Values.components.externalDns.domainFilters | nindent 10 }}
+        excludeDomains: {{ toYaml .Values.components.externalDns.excludeDomains | nindent 10 }}
+        {{- with .Values.components.externalDns.labelFilter }}
+        labelFilter: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.components.externalDns.annotationFilter }}
+        annotationFilter: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.components.externalDns.annotationPrefix }}
+        annotationPrefix: {{ . | quote }}
+        {{- end }}
+        managedRecordTypes: {{ toYaml .Values.components.externalDns.managedRecordTypes | nindent 10 }}
+
+        {{- with .Values.components.externalDns.txtPrefix }}
+        txtPrefix: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.components.externalDns.txtSuffix }}
+        txtSuffix: {{ . | quote }}
+        {{- end }}
+
+        provider:
+          name: {{ include "externalDns.provider" . | quote }}
+
+        extraArgs: {{ toYaml .Values.components.externalDns.extraArgs | nindent 10 }}
+        env: {{ toYaml .Values.components.externalDns.env | nindent 10 }}
+
+        serviceAccount:
+          create: {{ .Values.components.externalDns.serviceAccount.create }}
+          {{- with .Values.components.externalDns.serviceAccount.name }}
+          name: {{ . | quote }}
+          {{- end }}
+          {{- if gt (len $annotations) 0 }}
+          annotations: {{ toYaml $annotations | nindent 12 }}
+          {{- end }}
+
+        {{- if and (eq .Values.global.provider "azure") .Values.components.externalDns.azureWorkloadIdentity.enabled }}
+        podLabels:
+          azure.workload.identity/use: "true"
+        {{- end }}
+
+        serviceMonitor:
+          enabled: {{ .Values.components.externalDns.serviceMonitor.enabled }}
+          additionalLabels: {{ toYaml .Values.components.externalDns.serviceMonitor.additionalLabels | nindent 12 }}
+          annotations: {{ toYaml .Values.components.externalDns.serviceMonitor.annotations | nindent 12 }}
+          {{- with .Values.components.externalDns.serviceMonitor.interval }}
+          interval: {{ . | quote }}
+          {{- end }}
+          {{- with .Values.components.externalDns.serviceMonitor.scrapeTimeout }}
+          scrapeTimeout: {{ . | quote }}
+          {{- end }}
+
+        rbac:
+          create: {{ .Values.components.externalDns.rbac.create }}
+          additionalPermissions: {{ toYaml .Values.components.externalDns.rbac.additionalPermissions | nindent 12 }}
+
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: external-dns-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}

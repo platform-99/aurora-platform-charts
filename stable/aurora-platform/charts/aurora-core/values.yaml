@@ -745,6 +745,105 @@ components:
           kubernetes.io/os: linux
       bgpInstances: []
 
+  externalDns:
+    # Syncs Services and Ingress hostnames to your DNS provider (Route53, Azure DNS, etc.).
+    # Set domainFilters, provider credentials (IRSA / workload identity), and enable when ready.
+    enabled: false
+
+    helm: {}
+      # chart: external-dns
+      # repository: https://kubernetes-sigs.github.io/external-dns
+      # targetRevision: 1.21.1
+
+    imagePullSecrets: []
+    image:
+      # registry: registry.k8s.io
+      repository: external-dns/external-dns
+      # tag: # Defaults to chart AppVersion when unset
+      # pullPolicy: IfNotPresent
+
+    priorityClassName: platform-cluster-medium
+
+    resources: {}
+      # limits:
+      #   cpu: ""
+      #   memory: ""
+      # requests:
+      #   cpu: ""
+      #   memory: ""
+
+    nodeSelector:
+      kubernetes.io/os: linux
+      node.ssc-spc.gc.ca/purpose: system
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: external-dns
+
+    logLevel: info
+    logFormat: text
+    # The interval at which external-dns should sync the DNS records.
+    interval: 1m
+    # Whether to trigger a sync loop on every event.
+    triggerLoopOnEvent: false
+    # Whether to sync DNS records in a namespaced manner.
+    namespaced: false
+    # The policy for external-dns to use when syncing DNS records. Can be upsert-only, create-only, or sync.
+    policy: upsert-only
+    # The registry to use for external-dns. Can be txt, cname, a, aaaa, etc.
+    registry: txt
+    # The owner ID for the DNS records.
+    txtOwnerId: ""
+
+    sources:
+      - service
+      - ingress
+
+    domainFilters: []
+    excludeDomains: []
+    labelFilter: ""
+    annotationFilter: ""
+    annotationPrefix: ""
+    managedRecordTypes: []
+
+    txtPrefix: ""
+    txtSuffix: ""
+
+    # ExternalDNS provider name (e.g. aws, azure, azure-private-dns). When omitted or empty,
+    # defaults to global.provider (see templates/external-dns/_helpers.tpl).
+    # provider: azure-private-dns
+
+    extraArgs: {}
+    env: []
+
+    serviceAccount:
+      create: true
+      name: ""
+      annotations: {}
+
+    azureWorkloadIdentity:
+      enabled: true
+      # clientId: ""
+
+    serviceMonitor:
+      enabled: true
+      additionalLabels: {}
+      annotations: {}
+      interval: 60s
+      scrapeTimeout: 30s
+
+    rbac:
+      create: true
+      additionalPermissions: []
+
   fluentOperator:
     enabled: true
 
