@@ -28,7 +28,7 @@ spec:
       releaseName: external-dns
       values: |
         global:
-          imagePullSecrets: {{ toYaml .Values.components.externalDns.imagePullSecrets | nindent 10 }}
+          imagePullSecrets: {{ toYaml .Values.components.externalDns.imagePullSecrets | nindent 12 }}
 
         image: {{ default "{}" (include "externalDns.image" .) | nindent 10 }}
         imagePullSecrets: {{ toYaml .Values.components.externalDns.imagePullSecrets | nindent 10 }}

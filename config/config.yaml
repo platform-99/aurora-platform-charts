@@ -118,6 +118,11 @@ core:
             peerAddress: <FILL_IN_PEER_ADDRESS>/32
             name: peer-<FILL_IN_PEER_ADDRESS>
 
+    externalDns:
+      enabled: true
+      domainFilters:
+        - "patsula.site"
+
     falco:
       enabled: true
 
