@@ -1,9 +1,9 @@
-{{ if .Values.components.cilium.enabled -}}
+{{ if .Values.components.verticalPodAutoscaler.enabled -}}
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: "{{ .Values.global.cluster }}-cilium-netpol"
+  name: "{{ .Values.global.cluster }}-vertical-pod-autoscaler-netpol"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,14 +13,15 @@ spec:
     repoURL: {{ default .Values.global.helm.repository .Values.global.raw.helm.repository }}
     targetRevision: {{ .Values.global.raw.helm.targetRevision }}
     helm:
-      releaseName: cilium-netpol
+      releaseName: vertical-pod-autoscaler-netpol
       values: |
         resources:
+          # Baseline for a default-deny namespace: intra-namespace traffic (probes, webhook Service, certgen Job).
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
               name: allow-same-namespace
-              namespace: cilium-system
+              namespace: vertical-pod-autoscaler-system
             spec:
               podSelector: {}
               policyTypes:
@@ -35,26 +36,31 @@ spec:
           - apiVersion: cilium.io/v2
             kind: CiliumNetworkPolicy
             metadata:
-              name: allow-ingress-from-apiserver-to-cilium
-              namespace: cilium-system
+              name: allow-ingress-from-apiserver-to-vpa
+              namespace: vertical-pod-autoscaler-system
             spec:
               description: |
-                API server reaches Cilium operator/agent webhooks and health endpoints as needed.
-              endpointSelector: {}
+                API server calls the VPA admission webhook.
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vpa
+                  app.kubernetes.io/component: admission-controller
               ingress:
                 - fromEntities:
                     - kube-apiserver
           - apiVersion: cilium.io/v2
             kind: CiliumNetworkPolicy
             metadata:
-              name: allow-egress-to-apiserver-from-cilium
-              namespace: cilium-system
+              name: allow-egress-to-apiserver-from-vpa
+              namespace: vertical-pod-autoscaler-system
             spec:
               description: |
-                Cilium agents and operator sync cluster state via the Kubernetes API.
+                VPA recommender, updater, and admission-controller use the Kubernetes API.
                 Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
                 kubernetes Service (443) and the API server's native secure port (6443).
-              endpointSelector: {}
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vpa
               egress:
                 - toEntities:
                     - kube-apiserver
@@ -62,19 +68,6 @@ spec:
                     - ports:
                         - port: "443"
                         - port: "6443"
-          - apiVersion: cilium.io/v2
-            kind: CiliumNetworkPolicy
-            metadata:
-              name: allow-egress-from-hubble-relay-to-cilium-agents
-              namespace: cilium-system
-            spec:
-              endpointSelector:
-                matchLabels:
-                  io.cilium.k8s.policy.serviceaccount: hubble-relay
-              egress:
-                - toEntities:
-                  - host
-                  - remote-node
   destination:
     name: {{ .Values.global.cluster }}
     namespace: platform-system
