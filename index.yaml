@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   argocd-instance:
   - apiVersion: v2
+    appVersion: v3.2.9
+    created: "2026-06-03T04:51:38.369771057Z"
+    description: A Helm chart that configures Argo CD.
+    digest: 6f95bea2a911b36193bc78ba483619631126f95caafdd41a8df30adab625d35c
+    name: argocd-instance
+    type: application
+    urls:
+    - https://github.com/platform-99/aurora-platform-charts/releases/download/argocd-instance-0.16.0/argocd-instance-0.16.0.tgz
+    version: 0.16.0
+  - apiVersion: v2
     appVersion: v3.1.9
     created: "2026-03-10T01:24:48.959066493Z"
     description: A Helm chart that configures Argo CD.
@@ -38,6 +48,38 @@ entries:
     - https://github.com/platform-99/aurora-platform-charts/releases/download/aurora-namespace-0.0.11/aurora-namespace-0.0.11.tgz
     version: 0.0.11
   aurora-platform:
+  - apiVersion: v2
+    appVersion: 2.0.0
+    created: "2026-06-03T04:51:38.525683928Z"
+    dependencies:
+    - alias: core
+      condition: core.enabled
+      name: aurora-core
+      repository: ""
+      version: 0.0.1
+    - alias: app
+      condition: app.enabled
+      import-values:
+      - child: data
+        parent: global.imports
+      name: aurora-app
+      repository: ""
+      version: 0.0.1
+    - alias: mgmt
+      condition: mgmt.enabled
+      import-values:
+      - child: data
+        parent: global.imports
+      name: aurora-mgmt
+      repository: ""
+      version: 0.0.1
+    description: Aurora Platform
+    digest: e167773c11ecdb3f3e95274fd5c1884683b27addd91c7f786d92ce3146310b5f
+    name: aurora-platform
+    type: application
+    urls:
+    - https://github.com/platform-99/aurora-platform-charts/releases/download/aurora-platform-0.0.187/aurora-platform-0.0.187.tgz
+    version: 0.0.187
   - apiVersion: v2
     appVersion: 2.0.0
     created: "2026-05-15T02:51:03.691196169Z"
@@ -503,4 +545,4 @@ entries:
     urls:
     - https://github.com/platform-99/aurora-platform-charts/releases/download/raw-0.0.1/raw-0.0.1.tgz
     version: 0.0.1
-generated: "2026-05-15T02:51:03.691285934Z"
+generated: "2026-06-03T04:51:38.525781936Z"
