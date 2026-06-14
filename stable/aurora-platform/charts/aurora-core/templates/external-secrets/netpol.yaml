@@ -1,0 +1,193 @@
+{{ if .Values.components.externalSecrets.enabled -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-external-secrets-netpol"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ .Values.global.raw.helm.chart }}
+    repoURL: {{ default .Values.global.helm.repository .Values.global.raw.helm.repository }}
+    targetRevision: {{ .Values.global.raw.helm.targetRevision }}
+    helm:
+      releaseName: external-secrets-netpol
+      values: |
+        resources:
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-same-namespace
+              namespace: external-secrets-system
+            spec:
+              podSelector: {}
+              policyTypes:
+                - Ingress
+                - Egress
+              ingress:
+                - from:
+                  - podSelector: {}
+              egress:
+                - to:
+                  - podSelector: {}
+          # The API server calls the External Secrets validating/conversion webhook on 10250.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-ingress-from-apiserver-to-external-secrets-webhook
+              namespace: external-secrets-system
+            spec:
+              description: |
+                API server calls the External Secrets webhook (validation and CRD conversion).
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets-webhook
+              ingress:
+                - fromEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "10250"
+          # The controller and cert-controller list/watch ExternalSecret/SecretStore
+          # resources and create/update Kubernetes Secrets via the API server.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-apiserver-from-external-secrets
+              namespace: external-secrets-system
+            spec:
+              description: |
+                External Secrets reconciles its CRDs and manages Kubernetes Secrets via the API server.
+                Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
+                kubernetes Service (443) and the API server's native secure port (6443).
+              endpointSelector: {}
+              egress:
+                - toEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "443"
+                        - port: "6443"
+          # The controller must resolve cluster and external secret-store hostnames.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-dns-from-external-secrets
+              namespace: external-secrets-system
+            spec:
+              egress:
+              - ports:
+                - port: 53
+                  protocol: TCP
+                - port: 53
+                  protocol: UDP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets
+              policyTypes:
+              - Egress
+          # The controller connects to external secret stores over HTTPS
+          # (AWS Secrets Manager, Azure Key Vault, in-cluster OpenBao, etc.).
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-https-from-external-secrets
+              namespace: external-secrets-system
+            spec:
+              egress:
+              - ports:
+                - port: 443
+                  protocol: TCP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets
+              policyTypes:
+              - Egress
+          {{- if eq .Values.global.provider "aws" }}
+          # On AWS with EKS Pod Identity, the Pod Identity Agent serves temporary
+          # credentials from the node-local endpoint 169.254.170.23:80. Cilium represents
+          # the node as the `host` entity, so egress must target `toEntities: [host]`
+          # rather than an ipBlock CIDR (Cilium does not match link-local node addresses
+          # via CIDR-based policies). The controller needs this path to obtain IAM
+          # credentials for AWS Secrets Manager / Parameter Store.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-eks-pod-identity-from-external-secrets
+              namespace: external-secrets-system
+            spec:
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets
+              egress:
+                - toEntities:
+                    - host
+                  toPorts:
+                    - ports:
+                        - port: "80"
+                          protocol: TCP
+          {{- end }}
+          {{- if eq .Values.global.provider "azure" }}
+          # On Azure, workload identity / IMDS-style flows fetch tokens from the
+          # link-local metadata endpoint for Key Vault access.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-to-azure-metadata-from-external-secrets
+              namespace: external-secrets-system
+            spec:
+              egress:
+              - ports:
+                - port: 80
+                  protocol: TCP
+                to:
+                - ipBlock:
+                    cidr: {{ required "global.azureMetadataApiCidr is required" .Values.global.azureMetadataApiCidr | quote }}
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets
+              policyTypes:
+              - Egress
+          {{- end }}
+          # kube-prometheus-stack scrapes the External Secrets controller metrics (8080).
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-ingress-from-prometheus-to-external-secrets
+              namespace: external-secrets-system
+            spec:
+              ingress:
+              - ports:
+                - port: 8080
+                  protocol: TCP
+                from:
+                - namespaceSelector:
+                    matchLabels:
+                      namespace.ssc-spc.gc.ca/purpose: system
+                      kubernetes.io/metadata.name: prometheus-system
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: prometheus
+                      app.kubernetes.io/instance: kube-prometheus-stack-prometheus
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: external-secrets
+              policyTypes:
+              - Ingress
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: platform-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}

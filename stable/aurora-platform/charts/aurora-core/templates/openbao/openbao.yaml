@@ -1,0 +1,103 @@
+{{ if .Values.components.openbao.enabled -}}
+
+{{- $annotations := dict }}
+{{- range $k, $v := (.Values.components.openbao.server.serviceAccount.annotations | default dict) }}
+{{- $_ := set $annotations $k $v }}
+{{- end }}
+{{- if and (eq .Values.global.provider "azure") .Values.components.openbao.azureWorkloadIdentity.enabled .Values.components.openbao.azureWorkloadIdentity.clientId }}
+{{- $_ := set $annotations "azure.workload.identity/client-id" .Values.components.openbao.azureWorkloadIdentity.clientId }}
+{{- end }}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-openbao"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ default "openbao" .Values.components.openbao.helm.chart }}
+    {{- if .Values.components.openbao.helm.repository }}
+    repoURL: {{ .Values.components.openbao.helm.repository }}
+    {{- else }}
+    repoURL: {{ default "https://openbao.github.io/openbao-helm" .Values.global.helm.repository }}
+    {{- end }}
+    targetRevision: {{ default "0.28.3" .Values.components.openbao.helm.targetRevision }}
+    helm:
+      releaseName: openbao
+      values: |
+        global:
+          enabled: false
+          imagePullSecrets: {{ toYaml .Values.components.openbao.imagePullSecrets | nindent 12 }}
+
+        injector:
+          enabled: {{ .Values.components.openbao.injector.enabled }}
+
+        csi:
+          enabled: {{ .Values.components.openbao.csi.enabled }}
+
+        ui:
+          enabled: {{ .Values.components.openbao.ui.enabled }}
+
+        server:
+          enabled: true
+          image: {{ default "{}" (include "openbao.server.image" .) | nindent 12 }}
+
+          logLevel: {{ .Values.components.openbao.server.logLevel | quote }}
+          logFormat: {{ .Values.components.openbao.server.logFormat | quote }}
+
+          resources: {{ toYaml .Values.components.openbao.server.resources | nindent 12 }}
+          nodeSelector: {{ toYaml .Values.components.openbao.server.nodeSelector | nindent 12 }}
+          tolerations: {{ toYaml .Values.components.openbao.server.tolerations | nindent 12 }}
+          {{- with .Values.components.openbao.server.affinity }}
+          affinity: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          priorityClassName: {{ .Values.components.openbao.server.priorityClassName | quote }}
+
+          {{- if and (eq .Values.global.provider "azure") .Values.components.openbao.azureWorkloadIdentity.enabled }}
+          extraLabels:
+            azure.workload.identity/use: "true"
+          {{- end }}
+
+          serviceAccount:
+            create: {{ .Values.components.openbao.server.serviceAccount.create }}
+            {{- with .Values.components.openbao.server.serviceAccount.name }}
+            name: {{ . | quote }}
+            {{- end }}
+            {{- if gt (len $annotations) 0 }}
+            annotations: {{ toYaml $annotations | nindent 14 }}
+            {{- end }}
+
+          dataStorage:
+            enabled: {{ .Values.components.openbao.server.dataStorage.enabled }}
+            size: {{ .Values.components.openbao.server.dataStorage.size | quote }}
+            {{- with .Values.components.openbao.server.dataStorage.storageClass }}
+            storageClass: {{ . | quote }}
+            {{- end }}
+
+          auditStorage:
+            enabled: {{ .Values.components.openbao.server.auditStorage.enabled }}
+            size: {{ .Values.components.openbao.server.auditStorage.size | quote }}
+            {{- with .Values.components.openbao.server.auditStorage.storageClass }}
+            storageClass: {{ . | quote }}
+            {{- end }}
+
+          standalone:
+            enabled: {{ .Values.components.openbao.server.standalone.enabled }}
+
+          ha:
+            enabled: {{ .Values.components.openbao.server.ha.enabled }}
+            replicas: {{ .Values.components.openbao.server.ha.replicas }}
+            raft:
+              enabled: {{ .Values.components.openbao.server.ha.raft.enabled }}
+
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: openbao-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}

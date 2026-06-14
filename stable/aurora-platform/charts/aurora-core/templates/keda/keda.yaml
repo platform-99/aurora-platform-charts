@@ -1,0 +1,91 @@
+{{ if .Values.components.keda.enabled -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-keda"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ default "keda" .Values.components.keda.helm.chart }}
+    {{- if .Values.components.keda.helm.repository }}
+    repoURL: {{ .Values.components.keda.helm.repository }}
+    {{- else }}
+    repoURL: {{ default "https://kedacore.github.io/charts" .Values.global.helm.repository }}
+    {{- end }}
+    targetRevision: {{ default "2.20.1" .Values.components.keda.helm.targetRevision }}
+    helm:
+      releaseName: keda
+      values: |
+        global:
+          imagePullSecrets: {{ toYaml .Values.components.keda.imagePullSecrets | nindent 12 }}
+
+        clusterName: {{ .Values.global.cluster | quote }}
+
+        crds:
+          install: {{ .Values.components.keda.installCRDs }}
+
+        imagePullSecrets: {{ toYaml .Values.components.keda.imagePullSecrets | nindent 10 }}
+
+        image:
+          keda: {{ default "{}" (include "keda.image" (dict "image" .Values.components.keda.image.operator "global" .Values.global)) | nindent 12 }}
+          metricsApiServer: {{ default "{}" (include "keda.image" (dict "image" .Values.components.keda.image.metricsApiServer "global" .Values.global)) | nindent 12 }}
+          webhooks: {{ default "{}" (include "keda.image" (dict "image" .Values.components.keda.image.webhooks "global" .Values.global)) | nindent 12 }}
+          {{- with .Values.components.keda.image.pullPolicy }}
+          pullPolicy: {{ . }}
+          {{- end }}
+
+        operator:
+          replicaCount: {{ .Values.components.keda.operator.replicaCount }}
+
+        metricsServer:
+          replicaCount: {{ .Values.components.keda.metricsServer.replicaCount }}
+
+        webhooks:
+          enabled: {{ .Values.components.keda.webhooks.enabled }}
+
+        resources: {{ toYaml .Values.components.keda.resources | nindent 10 }}
+        nodeSelector: {{ toYaml .Values.components.keda.nodeSelector | nindent 10 }}
+        tolerations: {{ toYaml .Values.components.keda.tolerations | nindent 10 }}
+        {{- with .Values.components.keda.affinity }}
+        affinity: {{ toYaml . | nindent 10 }}
+        {{- end }}
+        priorityClassName: {{ .Values.components.keda.priorityClassName | quote }}
+
+        {{- if and (eq .Values.global.provider "azure") .Values.components.keda.azureWorkloadIdentity.enabled }}
+        podIdentity:
+          azureWorkload:
+            enabled: true
+            {{- with .Values.components.keda.azureWorkloadIdentity.clientId }}
+            clientId: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.components.keda.azureWorkloadIdentity.tenantId }}
+            tenantId: {{ . | quote }}
+            {{- end }}
+        {{- end }}
+
+        prometheus:
+          metricServer:
+            enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+            serviceMonitor:
+              enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+          operator:
+            enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+            serviceMonitor:
+              enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+          webhooks:
+            enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+            serviceMonitor:
+              enabled: {{ .Values.components.keda.serviceMonitor.enabled }}
+
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: keda-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+{{- end }}

@@ -841,6 +841,78 @@ components:
       create: true
       additionalPermissions: []
 
+  externalSecrets:
+    enabled: false
+
+    helm: {}
+      # chart: external-secrets
+      # repository: https://charts.external-secrets.io
+      # targetRevision: 2.6.0
+
+    imagePullSecrets: []
+
+    # Install the External Secrets CRDs (ExternalSecret, SecretStore, etc.) via the chart.
+    installCRDs: true
+
+    image:
+      # registry: ghcr.io
+      repository: external-secrets/external-secrets
+      # tag: ""
+      # pullPolicy: IfNotPresent
+
+    # Workload identity used by the controller to reach a cloud secret store
+    # (e.g. Azure Key Vault). Only applied when global.provider is azure.
+    azureWorkloadIdentity:
+      enabled: false
+      # clientId: ""
+
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node.ssc-spc.gc.ca/purpose: system
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+    affinity: {}
+    priorityClassName: platform-cluster-critical
+
+    serviceAccount:
+      create: true
+      # name: ""
+      annotations: {}
+
+    serviceMonitor:
+      enabled: false
+      # additionalLabels: {}
+      # interval: 30s
+
+    webhook:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+
+    certController:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+
   fluentOperator:
     enabled: true
 
@@ -1339,6 +1411,69 @@ components:
       # -- A list of volumes you want to add to the Falco pods.
       volumeMounts: []
 
+  keda:
+    enabled: false
+
+    helm: {}
+      # chart: keda
+      # repository: https://kedacore.github.io/charts
+      # targetRevision: 2.20.1
+
+    imagePullSecrets: []
+
+    # Install the KEDA CRDs (ScaledObject, TriggerAuthentication, etc.) via the chart.
+    installCRDs: true
+
+    image:
+      operator:
+        # registry: ghcr.io
+        repository: kedacore/keda
+        # tag: ""
+      metricsApiServer:
+        # registry: ghcr.io
+        repository: kedacore/keda-metrics-apiserver
+        # tag: ""
+      webhooks:
+        # registry: ghcr.io
+        repository: kedacore/keda-admission-webhooks
+        # tag: ""
+      # pullPolicy: Always
+
+    # Azure Workload Identity for KEDA scalers / pod authentication.
+    # Only applied when global.provider is azure.
+    azureWorkloadIdentity:
+      enabled: false
+      # clientId: ""
+      # tenantId: ""
+
+    operator:
+      replicaCount: 1
+
+    metricsServer:
+      replicaCount: 1
+
+    webhooks:
+      enabled: true
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: '1'
+        memory: 512Mi
+    nodeSelector:
+      kubernetes.io/os: linux
+      node.ssc-spc.gc.ca/purpose: system
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+    affinity: {}
+    priorityClassName: platform-cluster-critical
+
+    serviceMonitor:
+      enabled: false
+
   kubecost:
     enabled: false
 
@@ -1618,6 +1753,88 @@ components:
 
     tolerations:
       - operator: Exists
+
+  openbao:
+    enabled: false
+
+    helm: {}
+      # chart: openbao
+      # repository: https://openbao.github.io/openbao-helm
+      # targetRevision: 0.28.3
+
+    imagePullSecrets: []
+
+    # Workload identity used by the OpenBao server to reach a cloud KMS / Key Vault
+    # for auto-unseal. Only applied when global.provider is azure.
+    azureWorkloadIdentity:
+      enabled: false
+      # clientId: ""
+
+    server:
+      image:
+        # registry: quay.io
+        repository: openbao/openbao
+        # tag: "v2.5.4"
+        # pullPolicy: IfNotPresent
+
+      logLevel: info
+      logFormat: json
+
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: '1'
+          memory: 512Mi
+
+      nodeSelector:
+        kubernetes.io/os: linux
+        node.ssc-spc.gc.ca/purpose: system
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+      affinity: {}
+
+      priorityClassName: platform-cluster-critical
+
+      serviceAccount:
+        create: true
+        # name: ""
+        annotations: {}
+
+      dataStorage:
+        enabled: true
+        size: 10Gi
+        # storageClass: null
+
+      auditStorage:
+        enabled: false
+        size: 10Gi
+        # storageClass: null
+
+      # Standalone (single replica, file storage) is the default mode. For a
+      # highly-available deployment, set standalone.enabled to false and enable
+      # ha.raft instead (which requires manual init/unseal of the cluster).
+      standalone:
+        enabled: true
+
+      ha:
+        enabled: false
+        replicas: 3
+        raft:
+          enabled: false
+
+    ui:
+      enabled: false
+
+    # The Vault Agent Injector is provided by the separate vaultAgent component,
+    # so the bundled injector is disabled here by default.
+    injector:
+      enabled: false
+
+    csi:
+      enabled: false
 
   podtracker:
     enabled: true
