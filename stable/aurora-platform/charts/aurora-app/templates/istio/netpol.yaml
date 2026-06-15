@@ -96,6 +96,49 @@ spec:
               egress:
                 - to:
                   - podSelector: {}
+          # The Ingress controller watches Ingress resources and reconciles Istio Gateway /
+          # VirtualService objects via the Kubernetes API (including leader election). It does
+          # not use the `istio: general` label, so gateway-only policies do not cover it.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-apiserver-from-ingress-istio-controller
+              namespace: ingress-general-system
+            spec:
+              description: |
+                ingress-istio-controller watches Ingress resources and reconciles Istio config via the API server.
+                Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
+                kubernetes Service (443) and the API server's native secure port (6443).
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ingress-istio-controller
+              egress:
+                - toEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "443"
+                        - port: "6443"
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-dns-from-ingress-istio-controller
+              namespace: ingress-general-system
+            spec:
+              egress:
+              - ports:
+                - port: 53
+                  protocol: TCP
+                - port: 53
+                  protocol: UDP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ingress-istio-controller
+              policyTypes:
+              - Egress
           - apiVersion: cilium.io/v2
             kind: CiliumNetworkPolicy
             metadata:
@@ -128,6 +171,70 @@ spec:
                     - ports:
                         - port: "443"
                         - port: "6443"
+          # istiod fetches remote JWKS endpoints for JWT validation (PILOT_JWT_ENABLE_REMOTE_JWKS).
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-https-from-istiod
+              namespace: istio-system
+            spec:
+              egress:
+              - ports:
+                - port: 443
+                  protocol: TCP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app: istiod
+              policyTypes:
+              - Egress
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-dns-from-istiod
+              namespace: istio-system
+            spec:
+              egress:
+              - ports:
+                - port: 53
+                  protocol: TCP
+                - port: 53
+                  protocol: UDP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app: istiod
+              policyTypes:
+              - Egress
+          # kube-prometheus-stack and Kiali scrape istiod metrics on 15014.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-ingress-from-prometheus-to-istiod
+              namespace: istio-system
+            spec:
+              ingress:
+              - ports:
+                - port: 15014
+                  protocol: TCP
+                from:
+                - namespaceSelector:
+                    matchLabels:
+                      namespace.ssc-spc.gc.ca/purpose: system
+                      kubernetes.io/metadata.name: prometheus-system
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: prometheus
+                      app.kubernetes.io/instance: kube-prometheus-stack-prometheus
+              podSelector:
+                matchLabels:
+                  app: istiod
+              policyTypes:
+              - Ingress
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
@@ -174,6 +281,8 @@ spec:
                   protocol: TCP
                 - port: 80
                   protocol: TCP
+                - port: 15021
+                  protocol: TCP
                 {{- range .Values.components.istio.networkPolicy.ingressGeneral.extraIngressPorts }}
                 - port: {{ .port }}
                   protocol: {{ .protocol | default "TCP" }}
@@ -186,6 +295,26 @@ spec:
                   istio: general
               policyTypes:
               - Ingress
+          # AWS NLB / Azure LB health checks reach the gateway status port (15021) from the node.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-ingress-from-lb-healthchecks-to-ingress-general
+              namespace: ingress-general-system
+            spec:
+              description: |
+                Load balancer health checks target the gateway status port from the node/network plane.
+              endpointSelector:
+                matchLabels:
+                  istio: general
+              ingress:
+                - fromEntities:
+                    - host
+                    - remote-node
+                  toPorts:
+                    - ports:
+                        - port: "15021"
+                          protocol: TCP
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
@@ -205,6 +334,8 @@ spec:
                       port: 443
                     - protocol: TCP
                       port: 80
+                    - protocol: TCP
+                      port: 15021
                   from:
                     - namespaceSelector: {}
               policyTypes:
