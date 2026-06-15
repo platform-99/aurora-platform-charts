@@ -535,6 +535,84 @@ spec:
                           cidr: "{{ $val.ipAddress }}/32"
                       {{- end }}
               {{- end }}
+              # Prometheus discovers ServiceMonitors/PodMonitors and scrapes targets via the API server.
+              - apiVersion: cilium.io/v2
+                kind: CiliumNetworkPolicy
+                metadata:
+                  name: allow-egress-to-apiserver-from-prometheus
+                  namespace: prometheus-system
+                spec:
+                  description: |
+                    Prometheus discovers targets and Alertmanager configs via the Kubernetes API.
+                    Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
+                    kubernetes Service (443) and the API server's native secure port (6443).
+                  endpointSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: prometheus
+                  egress:
+                    - toEntities:
+                        - kube-apiserver
+                      toPorts:
+                        - ports:
+                            - port: "443"
+                            - port: "6443"
+              # The prometheus-operator reconciles Prometheus/ServiceMonitor CRs and serves admission webhooks.
+              - apiVersion: cilium.io/v2
+                kind: CiliumNetworkPolicy
+                metadata:
+                  name: allow-egress-to-apiserver-from-prometheus-operator
+                  namespace: prometheus-system
+                spec:
+                  description: |
+                    prometheus-operator manages monitoring CRs and validates PrometheusRule resources via the API server.
+                  endpointSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: kube-prometheus-stack-prometheus-operator
+                  egress:
+                    - toEntities:
+                        - kube-apiserver
+                      toPorts:
+                        - ports:
+                            - port: "443"
+                            - port: "6443"
+              # Component netpols grant ingress from Prometheus; this provides the matching egress to scrape
+              # ServiceMonitors in system namespaces (see prometheus.serviceMonitorNamespaceSelector).
+              - apiVersion: cilium.io/v2
+                kind: CiliumClusterwideNetworkPolicy
+                metadata:
+                  name: allow-egress-scrape-from-prometheus
+                spec:
+                  description: |
+                    Prometheus scrapes ServiceMonitors and PodMonitors in system namespaces on exporter metrics ports.
+                  endpointSelector:
+                    matchLabels:
+                      k8s:io.kubernetes.pod.namespace: prometheus-system
+                      app.kubernetes.io/name: prometheus
+                  egress:
+                    - toEndpoints:
+                        - matchExpressions:
+                            - key: k8s:io.cilium.k8s.namespace.labels.namespace.ssc-spc.gc.ca/purpose
+                              operator: In
+                              values:
+                                - system
+                      toPorts:
+                        - ports:
+                            - port: "8080"
+                            - port: "8081"
+                            - port: "8085"
+                            - port: "8443"
+                            - port: "9090"
+                            - port: "9091"
+                            - port: "9100"
+                            - port: "9153"
+                            - port: "9402"
+                            - port: "9666"
+                            - port: "9751"
+                            - port: "10250"
+                            - port: "10254"
+                            - port: "15014"
+                            - port: "15020"
+                            - port: "8200"
               {{- if .Values.components.prometheus.prometheus.netpol.allowFederation }}
               # Required for other Prometheus instances to request metrics from the Platform Prometheus
               - apiVersion: networking.k8s.io/v1
@@ -576,42 +654,6 @@ spec:
                   endpointSelector:
                     matchLabels:
                       app.kubernetes.io/name: prometheus
-              - apiVersion: cilium.io/v2
-                kind: CiliumNetworkPolicy
-                metadata:
-                  name: allow-egress-to-apiserver-from-prometheus
-                  namespace: prometheus-system
-                spec:
-                  description: |
-                    Prometheus discovers targets and Alertmanager configs via the Kubernetes API.
-                    Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
-                    kubernetes Service (443) and the API server's native secure port (6443).
-                  endpointSelector:
-                    matchLabels:
-                      app.kubernetes.io/name: prometheus
-                  egress:
-                    - toEntities:
-                        - kube-apiserver
-                      toPorts:
-                        - ports:
-                            - port: "443"
-                            - port: "6443"
-              - apiVersion: cilium.io/v2
-                kind: CiliumClusterwideNetworkPolicy
-                metadata:
-                  name: allow-egress-to-ceres-from-alertmanager
-                spec:
-                  description: |
-                    Allows Alertmanagers to send email notifications
-                  egress:
-                  - toFQDNs:
-                    - matchPattern: "email-smtp.ca-central-1.amazonaws.com"
-                    toPorts:
-                    - ports:
-                      - port: "25"
-                  endpointSelector:
-                    matchLabels:
-                      app.kubernetes.io/name: alertmanager
               - apiVersion: cilium.io/v2
                 kind: CiliumClusterwideNetworkPolicy
                 metadata:
