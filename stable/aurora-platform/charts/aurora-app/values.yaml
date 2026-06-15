@@ -310,6 +310,9 @@ components:
       additionalDnsNames: []
       additionalLBPorts: []
       additionalGatewayHosts: []
+      # Extra annotations merged onto the gateway LoadBalancer Service (after provider defaults).
+      additionalServiceAnnotations: {}
+        # service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
 
     ingressIstioController:
       helm: {}
