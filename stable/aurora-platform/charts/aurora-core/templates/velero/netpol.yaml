@@ -16,6 +16,7 @@ spec:
       releaseName: velero-netpol
       values: |
         resources:
+          # Leader election and intra-namespace traffic between Velero components.
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
@@ -32,10 +33,53 @@ spec:
               egress:
                 - to:
                   - podSelector: {}
+          # Velero backs up and restores Kubernetes resources via the API server.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-apiserver-from-velero
+              namespace: velero-system
+            spec:
+              description: |
+                Velero reads and writes cluster resources via the Kubernetes API.
+                Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
+                kubernetes Service (443) and the API server's native secure port (6443).
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: velero
+              egress:
+                - toEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "443"
+                        - port: "6443"
+          # Velero must resolve S3 / Azure Blob and other object-storage hostnames.
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
-              name: allow-egress-to-azureapi-from-velero
+              name: allow-egress-dns-from-velero
+              namespace: velero-system
+            spec:
+              egress:
+              - ports:
+                - port: 53
+                  protocol: TCP
+                - port: 53
+                  protocol: UDP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: velero
+              policyTypes:
+              - Egress
+          # Velero uploads backups and manages volume snapshots via cloud APIs over HTTPS.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-https-from-velero
               namespace: velero-system
             spec:
               egress:
@@ -45,24 +89,6 @@ spec:
                 to:
                 - ipBlock:
                     cidr: 0.0.0.0/0
-              podSelector:
-                matchLabels:
-                  app.kubernetes.io/name: velero
-              policyTypes:
-              - Egress
-          - apiVersion: networking.k8s.io/v1
-            kind: NetworkPolicy
-            metadata:
-              name: allow-egress-to-azure-imds-from-velero
-              namespace: velero-system
-            spec:
-              egress:
-              - ports:
-                - port: 80
-                  protocol: TCP
-                to:
-                - ipBlock:
-                    cidr: 169.254.169.254/32
               podSelector:
                 matchLabels:
                   app.kubernetes.io/name: velero
@@ -91,6 +117,31 @@ spec:
                         - port: "80"
                           protocol: TCP
           {{- end }}
+          # kube-prometheus-stack scrapes the Velero metrics port (8085).
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-ingress-from-prometheus-to-velero
+              namespace: velero-system
+            spec:
+              ingress:
+              - ports:
+                - port: 8085
+                  protocol: TCP
+                from:
+                - namespaceSelector:
+                    matchLabels:
+                      namespace.ssc-spc.gc.ca/purpose: system
+                      kubernetes.io/metadata.name: prometheus-system
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: prometheus
+                      app.kubernetes.io/instance: kube-prometheus-stack-prometheus
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: velero
+              policyTypes:
+              - Ingress
   destination:
     name: {{ .Values.global.cluster }}
     namespace: platform-system
