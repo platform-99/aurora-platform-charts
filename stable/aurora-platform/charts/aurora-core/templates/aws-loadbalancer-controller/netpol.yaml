@@ -17,10 +17,11 @@ spec:
       releaseName: aws-loadbalancer-controller-netpol
       values: |
         resources:
+          # Leader election and intra-namespace traffic between controller replicas.
           - apiVersion: networking.k8s.io/v1
             kind: NetworkPolicy
             metadata:
-              name: allow-all
+              name: allow-same-namespace
               namespace: aws-loadbalancer-controller-system
             spec:
               podSelector: {}
@@ -29,12 +30,136 @@ spec:
                 - Egress
               ingress:
                 - from:
-                    - ipBlock:
-                        cidr: 0.0.0.0/0
+                  - podSelector: {}
               egress:
                 - to:
-                    - ipBlock:
-                        cidr: 0.0.0.0/0
+                  - podSelector: {}
+          # The controller reconciles Ingress/Service/TargetGroupBinding resources and calls
+          # AWS APIs (ELB, EC2, WAF, etc.) over HTTPS.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-https-from-aws-loadbalancer-controller
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              egress:
+              - ports:
+                - port: 443
+                  protocol: TCP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              policyTypes:
+              - Egress
+          # The controller must resolve AWS API and cluster DNS hostnames.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-egress-dns-from-aws-loadbalancer-controller
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              egress:
+              - ports:
+                - port: 53
+                  protocol: TCP
+                - port: 53
+                  protocol: UDP
+                to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              policyTypes:
+              - Egress
+          # On AWS with EKS Pod Identity, the Pod Identity Agent serves temporary credentials from the
+          # node-local endpoint 169.254.170.23:80. Cilium represents the node as the `host` entity, so
+          # egress must target `toEntities: [host]` rather than an ipBlock CIDR (Cilium does not match
+          # link-local node addresses via CIDR-based policies). The controller needs this path to obtain
+          # IAM credentials for ELB/EC2/WAF API calls.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-eks-pod-identity-from-aws-loadbalancer-controller
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              egress:
+                - toEntities:
+                    - host
+                  toPorts:
+                    - ports:
+                        - port: "80"
+                          protocol: TCP
+          # The API server calls the validating webhook (failurePolicy: Fail) on 9443.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-ingress-from-apiserver-to-aws-loadbalancer-controller-webhook
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              description: |
+                API server calls the AWS Load Balancer Controller admission webhook.
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              ingress:
+                - fromEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "9443"
+          # The controller watches and reconciles Kubernetes resources via the API server.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-apiserver-from-aws-loadbalancer-controller
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              description: |
+                AWS Load Balancer Controller reconciles Ingress/Service resources via the API server.
+                Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
+                kubernetes Service (443) and the API server's native secure port (6443).
+              endpointSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              egress:
+                - toEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "443"
+                        - port: "6443"
+          # kube-prometheus-stack scrapes the controller metrics port (8080).
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-ingress-from-prometheus-to-aws-loadbalancer-controller
+              namespace: aws-loadbalancer-controller-system
+            spec:
+              ingress:
+              - ports:
+                - port: 8080
+                  protocol: TCP
+                from:
+                - namespaceSelector:
+                    matchLabels:
+                      namespace.ssc-spc.gc.ca/purpose: system
+                      kubernetes.io/metadata.name: prometheus-system
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: prometheus
+                      app.kubernetes.io/instance: kube-prometheus-stack-prometheus
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: aws-load-balancer-controller
+              policyTypes:
+              - Ingress
   destination:
     name: {{ .Values.global.cluster }}
     namespace: platform-system
