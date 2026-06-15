@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: "{{ .Values.global.cluster }}-argo-operator-netpol"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.global.project }}
+  source:
+    chart: {{ .Values.global.raw.helm.chart }}
+    repoURL: {{ default .Values.global.helm.repository .Values.global.raw.helm.repository }}
+    targetRevision: {{ .Values.global.raw.helm.targetRevision }}
+    helm:
+      releaseName: argo-operator-netpol
+      values: |
+        resources:
+          # Leader election and any intra-namespace traffic for the operator.
+          - apiVersion: networking.k8s.io/v1
+            kind: NetworkPolicy
+            metadata:
+              name: allow-same-namespace
+              namespace: argo-operator-system
+            spec:
+              podSelector: {}
+              policyTypes:
+                - Ingress
+                - Egress
+              ingress:
+                - from:
+                  - podSelector: {}
+              egress:
+                - to:
+                  - podSelector: {}
+          # The operator is a Kubernetes controller: it watches ArgoCD/AppProject CRs and
+          # reconciles them into Deployments/Services, performs leader election, and reads
+          # the namespaces listed in ARGOCD_CLUSTER_CONFIG_NAMESPACES. All of this is API
+          # server traffic. Ports 443 and 6443 cover both ways the API server is reached:
+          # the in-cluster kubernetes Service (443) and the API server's native secure
+          # port (6443). The operator never pulls git or uses a cloud SDK, so no
+          # Pod Identity / metadata egress is required.
+          - apiVersion: cilium.io/v2
+            kind: CiliumNetworkPolicy
+            metadata:
+              name: allow-egress-to-apiserver-from-argo-operator
+              namespace: argo-operator-system
+            spec:
+              description: |
+                The Argo CD operator reconciles ArgoCD CRs via the API server.
+              endpointSelector: {}
+              egress:
+                - toEntities:
+                    - kube-apiserver
+                  toPorts:
+                    - ports:
+                        - port: "443"
+                        - port: "6443"
+  destination:
+    name: {{ .Values.global.cluster }}
+    namespace: platform-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

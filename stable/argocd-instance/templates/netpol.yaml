@@ -41,28 +41,26 @@ spec:
 {{- if eq .Values.global.provider "aws" }}
 ---
 # On AWS with EKS Pod Identity, the Pod Identity Agent serves temporary credentials from the
-# link-local endpoint 169.254.170.23:80 (IPv6 [fd00:ec2::23]:80). Argo CD needs this path so the
-# application-controller and server can mint EKS auth tokens for managed clusters and the repo-server
-# can authenticate to AWS-backed repositories / the argocd-vault-plugin (awssecretsmanager).
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+# node-local endpoint 169.254.170.23:80. Cilium represents the node as the `host` entity, so egress
+# must target `toEntities: [host]` rather than an ipBlock CIDR (Cilium does not match link-local node
+# addresses via CIDR-based policies). Argo CD needs this path so the application-controller and server
+# can mint EKS auth tokens for managed clusters and the repo-server can authenticate to AWS-backed
+# repositories / the argocd-vault-plugin (awssecretsmanager).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: allow-egress-to-eks-pod-identity-from-argo
   labels:
     {{- include "argocd-foundation.labels" $ | nindent 4 }}
 spec:
-  podSelector: {}
+  endpointSelector: {}
   egress:
-    - ports:
-        - protocol: TCP
-          port: 80
-      to:
-        - ipBlock:
-            cidr: 169.254.170.23/32
-        - ipBlock:
-            cidr: fd00:ec2::23/128
-  policyTypes:
-    - Egress
+    - toEntities:
+        - host
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
 {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
