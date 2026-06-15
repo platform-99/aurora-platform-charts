@@ -34,6 +34,8 @@ spec:
                 - to:
                   - podSelector: {}
           # Velero backs up and restores Kubernetes resources via the API server.
+          # endpointSelector: {} covers the main Deployment and Helm hook Jobs (e.g.
+          # velero-upgrade-crds) whose pod templates omit app.kubernetes.io/name.
           - apiVersion: cilium.io/v2
             kind: CiliumNetworkPolicy
             metadata:
@@ -44,9 +46,7 @@ spec:
                 Velero reads and writes cluster resources via the Kubernetes API.
                 Ports 443 and 6443 cover both ways the API server is reached: the in-cluster
                 kubernetes Service (443) and the API server's native secure port (6443).
-              endpointSelector:
-                matchLabels:
-                  app.kubernetes.io/name: velero
+              endpointSelector: {}
               egress:
                 - toEntities:
                     - kube-apiserver
@@ -70,9 +70,7 @@ spec:
                 to:
                 - ipBlock:
                     cidr: 0.0.0.0/0
-              podSelector:
-                matchLabels:
-                  app.kubernetes.io/name: velero
+              podSelector: {}
               policyTypes:
               - Egress
           # Velero uploads backups and manages volume snapshots via cloud APIs over HTTPS.
@@ -89,9 +87,7 @@ spec:
                 to:
                 - ipBlock:
                     cidr: 0.0.0.0/0
-              podSelector:
-                matchLabels:
-                  app.kubernetes.io/name: velero
+              podSelector: {}
               policyTypes:
               - Egress
           {{- if eq .Values.global.provider "aws" }}
@@ -106,9 +102,7 @@ spec:
               name: allow-egress-to-eks-pod-identity-from-velero
               namespace: velero-system
             spec:
-              endpointSelector:
-                matchLabels:
-                  app.kubernetes.io/name: velero
+              endpointSelector: {}
               egress:
                 - toEntities:
                     - host
